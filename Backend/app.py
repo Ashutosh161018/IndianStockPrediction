@@ -1,86 +1,124 @@
 from flask import Flask, request, jsonify, send_from_directory
 import yfinance as yf
+import matplotlib
+matplotlib.use('Agg')  # Non-GUI backend, avoids Tkinter warnings
 import matplotlib.pyplot as plt
 import os
 import pandas as pd
+import wikipediaapi
 
 app = Flask(__name__, static_folder="../Frontend", static_url_path="")
 
-# Ensure charts folder exists
+# ---------------- SETUP ---------------- #
+
 charts_folder = "charts"
-if not os.path.exists(charts_folder):
-    os.makedirs(charts_folder)
+os.makedirs(charts_folder, exist_ok=True)
 
-# Load companies CSV
-csv_path = "companies.csv"
-if not os.path.exists(csv_path):
-    raise FileNotFoundError(f"{csv_path} not found in Backend folder!")
+companies_df = pd.read_csv("companies.csv")
 
-companies_df = pd.read_csv(csv_path)
+# ---------------- HELPER FUNCTIONS ---------------- #
 
-def get_ticker(company_name):
-    """Get NSE ticker from company name"""
-    row = companies_df[companies_df['name'].str.lower() == company_name.lower()]
-    if not row.empty:
-        return row['ticker'].values[0]
+def get_company_from_message(message):
+    message = message.lower()
+    for _, row in companies_df.iterrows():
+        if row['name'].lower() in message:
+            return row
     return None
 
-def predict_stock_price(ticker):
-    """Fetch last 60 days stock data and generate chart"""
+def get_stock_price(ticker):
     try:
-        data = yf.download(ticker, period="60d", progress=False, auto_adjust=True)
+        data = yf.download(ticker, period="60d", auto_adjust=True, progress=False)
         if data.empty:
             return None, None
 
-        # Create chart
-        plt.figure(figsize=(6,3))
-        data['Close'].plot(title=f"{ticker} Last 60 Days Close")
-        chart_path = os.path.join(charts_folder, f"{ticker}_chart.png")
+        plt.figure(figsize=(6, 3))
+        data['Close'].plot(title=f"{ticker} - Last 60 Days")
+        chart_path = f"{charts_folder}/{ticker}.png"
         plt.savefig(chart_path)
         plt.close()
 
-        latest_price = round(float(data['Close'].iloc[-1]), 2)
-        chart_url = f"http://127.0.0.1:5000/charts/{ticker}_chart.png"
-        return latest_price, chart_url
+        price = round(float(data['Close'].iloc[-1]), 2)
+        chart_url = f"http://127.0.0.1:5000/charts/{ticker}.png"
+        return price, chart_url
     except Exception as e:
-        print("Error fetching stock data:", e)
+        print("Stock error:", e)
         return None, None
 
-# API to handle chat messages
-@app.route("/ask", methods=["POST", "GET"])
-def ask():
-    if request.method == "GET":
-        return jsonify({"reply":"Use POST with JSON: {\"message\":\"Predict price of TCS\"}"})
+def get_company_info(wiki_name):
+    try:
+        wiki = wikipediaapi.Wikipedia(
+            language="en",
+            user_agent="StockTalkAI/1.0"
+        )
+        page = wiki.page(wiki_name)
 
-    data = request.get_json()
-    message = data.get("message", "").strip()
-    print("Received message:", message)
-
-    if message.lower().startswith("predict price of "):
-        company_name = message[17:].strip()
-        ticker = get_ticker(company_name)
-        print("Ticker found:", ticker)
-        if ticker:
-            price, chart_url = predict_stock_price(ticker)
-            if price:
-                return jsonify({"reply": f"{company_name} latest close price: ₹{price}", "chart_url": chart_url})
-            else:
-                return jsonify({"reply": "Error fetching stock data.", "chart_url": None})
+        if page.exists() and page.summary:
+            return page.summary[:500]
         else:
-            return jsonify({"reply": f"Company '{company_name}' not found in database.", "chart_url": None})
-    else:
-        return jsonify({"reply": "Hello! I am StockTalk AI. Ask me about NSE stocks like Infosys, TCS, Reliance.", "chart_url": None})
+            return "Sorry, I couldn't find company information."
+    except Exception as e:
+        print("Wiki error:", e)
+        return "Error fetching company information."
 
-# Serve charts
+# ---------------- API ---------------- #
+
+@app.route("/ask", methods=["POST"])
+def ask():
+    message = request.json.get("message", "").strip().lower()
+    print("User:", message)
+
+    company = get_company_from_message(message)
+
+    if company is None:
+        return jsonify({
+            "reply": "I couldn't identify the company. Please ask about an NSE company.",
+            "chart_url": None
+        })
+
+    company_name = company['name']
+    ticker = company['ticker']
+    wiki_name = company['wiki_name']
+
+    # STOCK PRICE REQUEST
+    if any(word in message for word in ["price", "stock", "share", "predict"]):
+        price, chart_url = get_stock_price(ticker)
+        if price:
+            return jsonify({
+                "reply": f"{company_name} latest stock price is ₹{price}",
+                "chart_url": chart_url
+            })
+        else:
+            return jsonify({
+                "reply": "Unable to fetch stock price right now.",
+                "chart_url": None
+            })
+
+    # COMPANY INFO REQUEST
+    if any(word in message for word in ["about", "who", "what", "tell"]):
+        info = get_company_info(wiki_name)
+        return jsonify({
+            "reply": info,
+            "chart_url": None
+        })
+
+    # DEFAULT SMART RESPONSE
+    return jsonify({
+        "reply": f"Do you want the stock price or company information about {company_name}?",
+        "chart_url": None
+    })
+
+# ---------------- STATIC FILES ---------------- #
+
 @app.route("/charts/<path:filename>")
-def serve_charts(filename):
+def charts(filename):
     return send_from_directory(charts_folder, filename)
 
-# Serve frontend
 @app.route("/")
 def index():
     return app.send_static_file("index.html")
 
+# ---------------- RUN ---------------- #
+
 if __name__ == "__main__":
-    print("Starting StockTalk AI backend...")
+    print("🚀 StockTalk AI running...")
     app.run(debug=True)

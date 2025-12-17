@@ -1,6 +1,21 @@
-name,ticker
-Infosys,INFY.NS
-TCS,TCS.NS
-Reliance,RELIANCE.NS
-HDFC Bank,HDFCBANK.NS
-ICICI Bank,ICICIBANK.NS
+name,ticker,wiki_name
+TCS,TCS.NS,Tata Consultancy Services
+Infosys,INFY.NS,Infosys
+Wipro,WIPRO.NS,Wipro
+Reliance,RELIANCE.NS,Reliance Industries
+HDFC Bank,HDFCBANK.NS,HDFC Bank
+ICICI Bank,ICICIBANK.NS,ICICI Bank
+State Bank of India,SBIN.NS,State Bank of India
+Axis Bank,AXISBANK.NS,Axis Bank
+Hindustan Unilever,HINDUNILVR.NS,Hindustan Unilever
+ITC,ITC.NS,ITC Limited
+Larsen & Toubro,LT.NS,Larsen & Toubro
+Bharti Airtel,BHARTIARTL.NS,Bharti Airtel
+Kotak Mahindra Bank,KOTAKBANK.NS,Kotak Mahindra Bank
+Asian Paints,ASIANPAINT.NS,Asian Paints
+Maruti Suzuki,MARUTI.NS,Maruti Suzuki
+HCL Technologies,HCLTECH.NS,HCL Technologies
+Sun Pharma,SUNPHARMA.NS,Sun Pharmaceutical
+Bajaj Finance,BAJFINANCE.NS,Bajaj Finance
+Tata Motors,TATAMOTORS.NS,Tata Motors
+UltraTech Cement,ULTRACEMCO.NS,UltraTech Cement
